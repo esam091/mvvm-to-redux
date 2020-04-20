@@ -104,12 +104,16 @@ class ViewController: UIViewController {
         output.shopNameError.drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
         output.domainNameError.drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.output.compactMap(/OpenShopOutput.selectedCity).map { $0.name }.drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        output.output.compactMap(/OpenShopOutput.citySelectionDone)
+            .filter { cityAndError in cityAndError.0 != nil }
+            .map { $0.0! }
+            .map { $0.name }.drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
         output.selectedDistrict.map { $0.name }.drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
         output.output
-            .compactMap(/OpenShopOutput.citySelectionError)
+            .compactMap(/OpenShopOutput.citySelectionDone)
+            .map { $0.1 }
             .map { err in err != nil ? "Please select city" : "" }
             .drive(cityLabel.rx.text).disposed(by: rx.disposeBag)
         

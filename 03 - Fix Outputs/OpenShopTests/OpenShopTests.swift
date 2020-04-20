@@ -144,7 +144,9 @@ class OpenShopTests: XCTestCase {
         
         input.onNext(.cityDidDismissed)
         
-        mergedOutput.assertValues([.citySelectionError(.dismissed)])
+        mergedOutput.assertValues([
+            .citySelectionDone(nil, .dismissed)
+        ])
         
         input.onNext(.cityDidSelected(city))
         
@@ -156,9 +158,8 @@ class OpenShopTests: XCTestCase {
 //        ])
         
         mergedOutput.assertValues([
-            .citySelectionError(.dismissed),
-            .selectedCity(city),
-            .citySelectionError(nil),
+            .citySelectionDone(nil, .dismissed),
+            .citySelectionDone(city, nil)
         ])
     }
 

@@ -25,8 +25,7 @@ enum OpenShopInput {
 }
 
 enum OpenShopOutput: Equatable {
-    case selectedCity(City)
-    case citySelectionError(CitySelectionError?)
+    case citySelectionDone(City?, CitySelectionError?)
 }
 
 class ViewModel {
@@ -110,10 +109,11 @@ class ViewModel {
         ).do(onNext: { cityError = $0 })
         
         let _selectCityFail2 = Driver.merge(
-            cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed },
-            cityDidSelected.map { _ -> CitySelectionError? in nil  }
+            cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed }
         ).do(onNext: { cityError = $0 })
-        .map(OpenShopOutput.citySelectionError)
+        .map { error in
+            OpenShopOutput.citySelectionDone(nil, error)
+        }
         
         
         let _selectCitySuccess = cityDidSelected
@@ -121,7 +121,7 @@ class ViewModel {
         
         let _selectCitySuccess2 = cityDidSelected
             .do(onNext: { city = $0 })
-            .map(OpenShopOutput.selectedCity)
+            .map { OpenShopOutput.citySelectionDone($0, nil) }
         
         let selectedDistrict = districtDidSelected
             .do(onNext: { district = $0 })

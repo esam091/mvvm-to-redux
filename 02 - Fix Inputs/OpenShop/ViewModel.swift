@@ -10,19 +10,21 @@ import Foundation
 import RxSwift
 import RxRelay
 import RxCocoa
+import CasePaths
+
+
+enum OpenShopInput {
+    case shopNameDidChange(String)
+    case shopDomainDidChange(String)
+    case cityDidSelected(City)
+    case cityDidDismissed
+    case districtDidTapped
+    case districtDidSelected(District)
+    case districtDidDismissed
+    case submitButtonDidTap
+}
 
 class ViewModel {
-    struct Input {
-        let shopNameDidChange: Driver<String>
-        let shopDomainDidChange: Driver<String>
-        let cityDidSelected: Driver<City>
-        let cityDidDismissed: Driver<Void>
-        let districtDidTapped: Driver<Void>
-        let districtDidSelected: Driver<District>
-        let districtDidDismissed: Driver<Void>
-        let submitButtonDidTap: Driver<Void>
-    }
-    
     struct Output {
         let shopNameError: Driver<String?>
         let domainName: Driver<String>
@@ -44,7 +46,7 @@ class ViewModel {
     }
     
     
-    func transform(_ input: Input) -> Output {
+    func transform(_ input: Driver<OpenShopInput>) -> Output {
         let useCase = self.useCase
         
         var shopName: String?
@@ -59,8 +61,17 @@ class ViewModel {
         var district: District?
         var districtError: DistrictSelectionError?
         
-        let inputShopName = input.shopNameDidChange.do(onNext: { shopName = $0 })
-        let shopDomain = input.shopDomainDidChange.do(onNext: { selectedDomainName = $0 })
+        let shopNameDidChange = input.compactMap(/OpenShopInput.shopNameDidChange)
+        let shopDomainDidChange = input.compactMap(/OpenShopInput.shopDomainDidChange)
+        let cityDidSelected = input.compactMap(/OpenShopInput.cityDidSelected)
+        let cityDidDismissed = input.compactMap(/OpenShopInput.cityDidDismissed)
+        let districtDidSelected = input.compactMap(/OpenShopInput.districtDidSelected)
+        let districtDidDismissed = input.compactMap(/OpenShopInput.districtDidDismissed)
+        let districtDidTapped = input.compactMap(/OpenShopInput.districtDidTapped)
+        let submitButtonDidTap = input.compactMap(/OpenShopInput.submitButtonDidTap)
+        
+        let inputShopName = shopNameDidChange.do(onNext: { shopName = $0 })
+        let shopDomain = shopDomainDidChange.do(onNext: { selectedDomainName = $0 })
         
         let shopNameCheck = inputShopName
             .flatMapLatest {
@@ -89,28 +100,28 @@ class ViewModel {
         ).do(onNext: { domainErrorMessage = $0 })
         
         let _selectCityFail = Driver.merge(
-            input.cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed },
-            input.cityDidSelected.map { _ -> CitySelectionError? in nil  }
+            cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed },
+            cityDidSelected.map { _ -> CitySelectionError? in nil  }
         ).do(onNext: { cityError = $0 })
         
         
-        let _selectCitySuccess = input.cityDidSelected
+        let _selectCitySuccess = cityDidSelected
             .do(onNext: { city = $0 })
         
-        let selectedDistrict = input.districtDidSelected
+        let selectedDistrict = districtDidSelected
             .do(onNext: { district = $0 })
         
         let districtFailure = Driver<DistrictSelectionError?>.merge(
-            input.districtDidDismissed.filter { _ in district == nil }.map { _ in DistrictSelectionError.dismissed },
-            input.districtDidTapped.filter { _ in city == nil }.map { _ in DistrictSelectionError.noCitySelected },
-            input.districtDidTapped.filter { _ in city != nil }.map { _ in nil }
+            districtDidDismissed.filter { _ in district == nil }.map { _ in DistrictSelectionError.dismissed },
+            districtDidTapped.filter { _ in city == nil }.map { _ in DistrictSelectionError.noCitySelected },
+            districtDidTapped.filter { _ in city != nil }.map { _ in nil }
         ).do(onNext: { districtError = $0 })
         
-        let showDistrictSelection = input.districtDidTapped
+        let showDistrictSelection = districtDidTapped
             .filter { _ in city != nil }
             .map { () }
         
-        let submissionResult = input.submitButtonDidTap
+        let submissionResult = submitButtonDidTap
             .filter {
                 shopName != nil
                     && shopNameErrorMessage == nil

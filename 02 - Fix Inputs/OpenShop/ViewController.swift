@@ -31,11 +31,11 @@ class ViewController: UIViewController {
     required init?(coder: NSCoder) {
         var useCase = UseCase.mock
         
-//        useCase.checkShopName = { name in
-//            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: "shop name already taken"))
-//                .delay(.seconds(2))
-//
-//        }
+        useCase.checkShopName = { name in
+            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: nil))
+                .delay(.seconds(2))
+
+        }
         
         useCase.submit = { _ in
             Driver.just(.success(())).delay(.seconds(1))
@@ -69,18 +69,33 @@ class ViewController: UIViewController {
         let districtDidSelected = districtSelection.flatMap { $0.selectedDistrict }
         let districtDidDismissed = districtSelection.flatMap { $0.closed }
         
-        let input = ViewModel.Input(
-            shopNameDidChange: shopNameField.rx.textChanged.asDriver(onErrorDriveWith: .empty()),
-            shopDomainDidChange: shopDomainField.rx.textChanged.asDriver(onErrorDriveWith: .empty()),
-            cityDidSelected: cityDidSelected,
-            cityDidDismissed: citySelectionDismissed,
-            districtDidTapped: districtButton.rx.tap.asDriver(),
-            districtDidSelected: districtDidSelected,
-            districtDidDismissed: districtDidDismissed,
-            submitButtonDidTap: createShopButton.rx.tap.asDriver()
-        )
-        
-        let output = viewModel.transform(input)
+        let output = viewModel.transform(Driver.merge(
+            shopNameField
+                .rx.textChanged
+                .asDriver(onErrorDriveWith: .empty())
+                .map(OpenShopInput.shopNameDidChange),
+            
+            shopDomainField.rx.textChanged.asDriver(onErrorDriveWith: .empty())
+                .map(OpenShopInput.shopDomainDidChange),
+            
+            cityDidSelected
+                .map(OpenShopInput.cityDidSelected),
+            
+            citySelectionDismissed
+                .map { OpenShopInput.cityDidDismissed },
+            
+            districtButton.rx.tap.asDriver()
+                .map { OpenShopInput.districtDidTapped },
+            
+            districtDidSelected
+                .map(OpenShopInput.districtDidSelected),
+            
+            districtDidDismissed
+                .map { OpenShopInput.districtDidDismissed },
+            
+            createShopButton.rx.tap.asDriver()
+                .map { OpenShopInput.submitButtonDidTap }
+        ))
         
         output.showDistrictSelection.drive(showDistrictSelection).disposed(by: rx.disposeBag)
         

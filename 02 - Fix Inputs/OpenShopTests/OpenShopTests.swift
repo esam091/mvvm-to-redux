@@ -37,17 +37,9 @@ extension TestObserver where Element: Equatable {
 class OpenShopTests: XCTestCase {
     var viewModel: ViewModel!
     var useCase: UseCase!
+    var input = PublishSubject<OpenShopInput>()
     
     var disposeBag = DisposeBag()
-    
-    let shopNameDidChange = PublishSubject<String>()
-    let shopDomainDidChange = PublishSubject<String>()
-    let cityDidSelected = PublishSubject<City>()
-    let cityDidDismissed = PublishSubject<Void>()
-    let districtDidTapped = PublishSubject<Void>()
-    let districtDidSelected = PublishSubject<District>()
-    let districtDidDismissed = PublishSubject<Void>()
-    let submitButtonDidTap = PublishSubject<Void>()
     
     let shopNameError = TestObserver<String?>()
     let domainName = TestObserver<String>()
@@ -64,21 +56,10 @@ class OpenShopTests: XCTestCase {
     }
     
     override func setUp() {
-        let input = ViewModel.Input(
-            shopNameDidChange: shopNameDidChange.asDriver(onErrorDriveWith: .empty()),
-            shopDomainDidChange: shopDomainDidChange.asDriver(onErrorDriveWith: .empty()),
-            cityDidSelected: cityDidSelected.asDriver(onErrorDriveWith: .empty()),
-            cityDidDismissed: cityDidDismissed.asDriver(onErrorDriveWith: .empty()),
-            districtDidTapped: districtDidTapped.asDriver(onErrorDriveWith: .empty()),
-            districtDidSelected: districtDidSelected.asDriver(onErrorDriveWith: .empty()),
-            districtDidDismissed: districtDidDismissed.asDriver(onErrorDriveWith: .empty()),
-            submitButtonDidTap: submitButtonDidTap.asDriver(onErrorDriveWith: .empty())
-        )
-        
         useCase = UseCase.mock
         viewModel = ViewModel(useCase: useCase)
         
-        let output = viewModel.transform(input)
+        let output = viewModel.transform(input.asDriver(onErrorDriveWith: .empty()))
         output.shopNameError.drive(shopNameError).disposed(by: disposeBag)
         output.domainName.drive(domainName).disposed(by: disposeBag)
         output.domainNameError.drive(domainNameError).disposed(by: disposeBag)
@@ -94,99 +75,99 @@ class OpenShopTests: XCTestCase {
         useCase.checkShopName = { _ in
             .just(ValidateShopNameResponse(suggestedDomain: "foo", shopNameErrorMessage: nil))
         }
-        
-        shopNameDidChange.onNext("something")
-        
+
+        input.onNext(.shopNameDidChange("something"))
+
         shopNameError.assertValues([nil])
         domainName.assertValues(["foo"])
     }
-    
+
     func test_inputShopName_showDomainSuggestionWithErrors() {
         let called = expectation(description: "use case called")
-        
+
         useCase.checkShopName = { _ in
             Driver.just(ValidateShopNameResponse(suggestedDomain: "bar", shopNameErrorMessage: "error message"))
                 .delay(.nanoseconds(1))
                 .do(onNext: { _ in called.fulfill() })
         }
-        
-        shopNameDidChange.onNext("another thing")
-        
+
+        input.onNext(.shopNameDidChange("another thing"))
+
         wait(for: [called], timeout: 0.001)
-        
+
         shopNameError.assertValues([nil, "error message"])
         domainName.assertValues(["bar"])
     }
-    
+
     func test_inputDomainName_valid() {
         useCase.checkDomainName = { _ in
             .just(.success(()))
         }
-        
-        shopDomainDidChange.onNext("foo")
-        
+
+        input.onNext(.shopDomainDidChange("foo"))
+
         domainNameError.assertValues([nil, nil])
     }
-    
+
     func test_inputDomainName_invalid() {
         useCase.checkDomainName = { _ in
             .just(.failure(SimpleErrorMessage(message: "error")))
         }
-        
-        shopDomainDidChange.onNext("foo")
-        
+
+        input.onNext(.shopDomainDidChange("foo"))
+
         domainNameError.assertValues([nil, "error"])
     }
-    
+
     func test_inputCity_dismissed() {
-        cityDidDismissed.onNext(())
-        
+        input.onNext(.cityDidDismissed)
+
         citySelectionError.assertValues([.dismissed])
     }
-    
+
     func test_inputCity_success() {
         let city = City(id: 1, name: "Hyrule")
-        cityDidSelected.onNext(city)
-        
+        input.onNext(.cityDidSelected(city))
+
         selectedCity.assertValues([city])
-        
-        cityDidDismissed.onNext(())
-        
+
+            input.onNext(.cityDidDismissed)
+
         selectedCity.assertValues([city])
     }
-    
+
     func test_inputDistrict_success() {
         let city = City(id: 2, name: "Tokyo")
         let district = District(id: 1, name: "Shibuya")
+
+        input.onNext(.cityDidSelected(city))
         
-        cityDidSelected.onNext(city)
-        
-        districtDidTapped.onNext(())
+        input.onNext(.districtDidTapped)
         
         showDistrictSelection.assertDidEmitValues(count: 1)
         
-        districtDidSelected.onNext(district)
-        
+        input.onNext(.districtDidSelected(district))
+
         selectedDistrict.assertValues([district])
     }
-    
+
     func test_inputDistrict_noCitySelected() {
-        districtDidTapped.onNext(())
-        
+        input.onNext(.districtDidTapped)
+
         districtSelectionError.assertValues([.noCitySelected])
     }
-    
+
     func test_inputDistrict_dismissed() {
         let city = City(id: 2, name: "Tokyo")
-        
-        cityDidSelected.onNext(city)
-        
-        districtDidTapped.onNext(())
-        
+
+        input.onNext(.cityDidSelected(city))
+
+        input.onNext(.districtDidTapped)
+
         showDistrictSelection.assertDidEmitValues(count: 1)
         
-        districtDidDismissed.onNext(())
-        
+        input.onNext(.districtDidDismissed)
+
         districtSelectionError.assertValues([nil, .dismissed])
     }
     
@@ -198,20 +179,19 @@ class OpenShopTests: XCTestCase {
             .just(ValidateShopNameResponse(suggestedDomain: "foo-domain", shopNameErrorMessage: nil))
         }
         
+
         useCase.submit = { _ in
             .just(.success(()))
         }
+        input.onNext(.shopNameDidChange("foo-shop"))
         
+        input.onNext(.cityDidSelected(city))
         
-        shopNameDidChange.onNext("foo-shop")
+        input.onNext(.districtDidTapped)
         
-        cityDidSelected.onNext(city)
+        input.onNext(.districtDidSelected(district))
         
-        districtDidTapped.onNext(())
-        
-        districtDidSelected.onNext(district)
-        
-        submitButtonDidTap.onNext(())
+        input.onNext(.submitButtonDidTap)
         
         submissionResult.assertDidEmitValues(count: 1)
     }

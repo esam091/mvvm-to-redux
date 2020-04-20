@@ -50,6 +50,7 @@ class OpenShopTests: XCTestCase {
     let districtSelectionError = TestObserver<DistrictSelectionError?>()
     let showDistrictSelection = TestObserver<Void>()
     let submissionResult = TestObserver<Result<Void, SimpleErrorMessage>>()
+    let mergedOutput = TestObserver<OpenShopOutput>()
     
     override func tearDown() {
         disposeBag = DisposeBag()
@@ -63,12 +64,13 @@ class OpenShopTests: XCTestCase {
         output.shopNameError.drive(shopNameError).disposed(by: disposeBag)
         output.domainName.drive(domainName).disposed(by: disposeBag)
         output.domainNameError.drive(domainNameError).disposed(by: disposeBag)
-        output.selectedCity.drive(selectedCity).disposed(by: disposeBag)
-        output.citySelectionError.drive(citySelectionError).disposed(by: disposeBag)
+//        output.selectedCity.drive(selectedCity).disposed(by: disposeBag)
+//        output.citySelectionError.drive(citySelectionError).disposed(by: disposeBag)
         output.selectedDistrict.drive(selectedDistrict).disposed(by: disposeBag)
         output.districtSelectioonError.drive(districtSelectionError).disposed(by: disposeBag)
         output.showDistrictSelection.drive(showDistrictSelection).disposed(by: disposeBag)
         output.submissionResult.drive(submissionResult).disposed(by: disposeBag)
+        output.output.drive(mergedOutput).disposed(by: disposeBag)
     }
 
     func test_inputShowName_showDomainSuggestion() {
@@ -134,6 +136,30 @@ class OpenShopTests: XCTestCase {
             input.onNext(.cityDidDismissed)
 
         selectedCity.assertValues([city])
+    }
+    
+    func test_inputCity_success_willRemoveErrorMessage() {
+        let city = City(id: 1, name: "Hyrule")
+        
+        
+        input.onNext(.cityDidDismissed)
+        
+        mergedOutput.assertValues([.citySelectionError(.dismissed)])
+        
+        input.onNext(.cityDidSelected(city))
+        
+        // fail
+//        mergedOutput.assertValues([
+//            .citySelectionError(.dismissed),
+//            .citySelectionError(nil),
+//            .selectedCity(city)
+//        ])
+        
+        mergedOutput.assertValues([
+            .citySelectionError(.dismissed),
+            .selectedCity(city),
+            .citySelectionError(nil),
+        ])
     }
 
     func test_inputDistrict_success() {

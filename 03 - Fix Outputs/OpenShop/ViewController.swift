@@ -10,6 +10,7 @@ import UIKit
 import RxCocoa
 import NSObject_Rx
 import RxSwift
+import CasePaths
 
 class ViewController: UIViewController {
     @IBOutlet var shopNameField: UITextField!
@@ -103,11 +104,12 @@ class ViewController: UIViewController {
         output.shopNameError.drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
         output.domainNameError.drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.selectedCity.map { $0.name }.drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        output.output.compactMap(/OpenShopOutput.selectedCity).map { $0.name }.drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
         output.selectedDistrict.map { $0.name }.drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
-        output.citySelectionError
+        output.output
+            .compactMap(/OpenShopOutput.citySelectionError)
             .map { err in err != nil ? "Please select city" : "" }
             .drive(cityLabel.rx.text).disposed(by: rx.disposeBag)
         

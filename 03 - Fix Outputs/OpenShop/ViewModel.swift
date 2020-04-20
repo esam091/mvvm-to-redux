@@ -24,18 +24,23 @@ enum OpenShopInput {
     case submitButtonDidTap
 }
 
+enum OpenShopOutput: Equatable {
+    case selectedCity(City)
+    case citySelectionError(CitySelectionError?)
+}
+
 class ViewModel {
     struct Output {
         let shopNameError: Driver<String?>
         let domainName: Driver<String>
         let domainNameError: Driver<String?>
         
-        let selectedCity: Driver<City>
-        let citySelectionError: Driver<CitySelectionError?>
         let selectedDistrict: Driver<District>
         let districtSelectioonError: Driver<DistrictSelectionError?>
         let showDistrictSelection: Driver<Void>
         let submissionResult: Driver<Result<Void, SimpleErrorMessage>>
+        
+        let output: Driver<OpenShopOutput>
     }
     
     private let useCase: UseCase
@@ -104,9 +109,19 @@ class ViewModel {
             cityDidSelected.map { _ -> CitySelectionError? in nil  }
         ).do(onNext: { cityError = $0 })
         
+        let _selectCityFail2 = Driver.merge(
+            cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed },
+            cityDidSelected.map { _ -> CitySelectionError? in nil  }
+        ).do(onNext: { cityError = $0 })
+        .map(OpenShopOutput.citySelectionError)
+        
         
         let _selectCitySuccess = cityDidSelected
             .do(onNext: { city = $0 })
+        
+        let _selectCitySuccess2 = cityDidSelected
+            .do(onNext: { city = $0 })
+            .map(OpenShopOutput.selectedCity)
         
         let selectedDistrict = districtDidSelected
             .do(onNext: { district = $0 })
@@ -144,14 +159,15 @@ class ViewModel {
             domainName: domainSuggestion,
         
             domainNameError: _shopDomainError,
-            
-            selectedCity: _selectCitySuccess,
-            citySelectionError: _selectCityFail,
             selectedDistrict: selectedDistrict,
             
             districtSelectioonError: districtFailure,
             showDistrictSelection: showDistrictSelection,
-            submissionResult: submissionResult
+            submissionResult: submissionResult,
+            output: .merge(
+                _selectCitySuccess2,
+                _selectCityFail2
+            )
         )
     }
 }

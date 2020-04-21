@@ -24,18 +24,25 @@ enum OpenShopInput {
     case submitButtonDidTap
 }
 
+struct State {
+    var shopName: String?
+    var shopNameErrorMessage: String?
+    
+    var selectedDomainName: String?
+    var domainErrorMessage: String?
+    
+    var city: City?
+    var cityError: CitySelectionError?
+    
+    var district: District?
+    var districtError: DistrictSelectionError?
+}
+
 class ViewModel {
     struct Output {
-        let shopNameError: Driver<String?>
-        let domainName: Driver<String>
-        let domainNameError: Driver<String?>
-        
-        let selectedCity: Driver<City>
-        let citySelectionError: Driver<CitySelectionError?>
-        let selectedDistrict: Driver<District>
-        let districtSelectioonError: Driver<DistrictSelectionError?>
         let showDistrictSelection: Driver<Void>
         let submissionResult: Driver<Result<Void, SimpleErrorMessage>>
+        let state: Driver<State>
     }
     
     private let useCase: UseCase
@@ -49,17 +56,7 @@ class ViewModel {
     func transform(_ input: Driver<OpenShopInput>) -> Output {
         let useCase = self.useCase
         
-        var shopName: String?
-        var shopNameErrorMessage: String?
-        
-        var selectedDomainName: String?
-        var domainErrorMessage: String?
-        
-        var city: City?
-        var cityError: CitySelectionError?
-        
-        var district: District?
-        var districtError: DistrictSelectionError?
+        var state = State()
         
         let shopNameDidChange = input.compactMap(/OpenShopInput.shopNameDidChange)
         let shopDomainDidChange = input.compactMap(/OpenShopInput.shopDomainDidChange)
@@ -70,15 +67,15 @@ class ViewModel {
         let districtDidTapped = input.compactMap(/OpenShopInput.districtDidTapped)
         let submitButtonDidTap = input.compactMap(/OpenShopInput.submitButtonDidTap)
         
-        let inputShopName = shopNameDidChange.do(onNext: { shopName = $0 })
-        let shopDomain = shopDomainDidChange.do(onNext: { selectedDomainName = $0 })
+        let inputShopName = shopNameDidChange.do(onNext: { state.shopName = $0 })
+        let shopDomain = shopDomainDidChange.do(onNext: { state.selectedDomainName = $0 })
         
         let shopNameCheck = inputShopName
             .flatMapLatest {
                 useCase.checkShopName($0)
         }
         
-        let domainSuggestion = shopNameCheck.map { $0.suggestedDomain }.do(onNext: { selectedDomainName = $0 })
+        let domainSuggestion = shopNameCheck.map { $0.suggestedDomain }.do(onNext: { state.selectedDomainName = $0 })
         
         let shopNameError = Driver<String?>.merge(
             shopNameCheck.map { $0.shopNameErrorMessage }.filter {
@@ -87,7 +84,7 @@ class ViewModel {
             
             inputShopName.map { _ in nil }
         )
-            .do(onNext: { shopNameErrorMessage = $0 })
+            .do(onNext: { state.shopNameErrorMessage = $0 })
         
         let domainCheck = shopDomain.flatMap { domain in
             useCase.checkDomainName(domain)
@@ -97,61 +94,61 @@ class ViewModel {
             shopDomain.map { _ in nil },
             domainCheck.success.map { nil },
             domainCheck.failure.map { $0.message }
-        ).do(onNext: { domainErrorMessage = $0 })
+        ).do(onNext: { state.domainErrorMessage = $0 })
         
         let _selectCityFail = Driver.merge(
-            cityDidDismissed.filter { _ in city == nil } .map { CitySelectionError.dismissed },
+            cityDidDismissed.filter { _ in state.city == nil } .map { CitySelectionError.dismissed },
             cityDidSelected.map { _ -> CitySelectionError? in nil  }
-        ).do(onNext: { cityError = $0 })
+        ).do(onNext: { state.cityError = $0 })
         
         
         let _selectCitySuccess = cityDidSelected
-            .do(onNext: { city = $0 })
+            .do(onNext: { state.city = $0 })
         
         let selectedDistrict = districtDidSelected
-            .do(onNext: { district = $0 })
+            .do(onNext: { state.district = $0 })
         
         let districtFailure = Driver<DistrictSelectionError?>.merge(
-            districtDidDismissed.filter { _ in district == nil }.map { _ in DistrictSelectionError.dismissed },
-            districtDidTapped.filter { _ in city == nil }.map { _ in DistrictSelectionError.noCitySelected },
-            districtDidTapped.filter { _ in city != nil }.map { _ in nil }
-        ).do(onNext: { districtError = $0 })
+            districtDidDismissed.filter { _ in state.district == nil }.map { _ in DistrictSelectionError.dismissed },
+            districtDidTapped.filter { _ in state.city == nil }.map { _ in DistrictSelectionError.noCitySelected },
+            districtDidTapped.filter { _ in state.city != nil }.map { _ in nil }
+        ).do(onNext: { state.districtError = $0 })
         
         let showDistrictSelection = districtDidTapped
-            .filter { _ in city != nil }
+            .filter { _ in state.city != nil }
             .map { () }
         
         let submissionResult = submitButtonDidTap
             .filter {
-                shopName != nil
-                    && shopNameErrorMessage == nil
-                    && selectedDomainName != nil
-                    && domainErrorMessage == nil
-                    && city != nil
-                    && cityError == nil
-                    && district != nil
-                    && districtError == nil
+                state.shopName != nil
+                    && state.shopNameErrorMessage == nil
+                    && state.selectedDomainName != nil
+                    && state.domainErrorMessage == nil
+                    && state.city != nil
+                    && state.cityError == nil
+                    && state.district != nil
+                    && state.districtError == nil
         }
         .map { _ in
-            Form(domainName: selectedDomainName!, shopName: shopName!, cityID: city!.id, districtID: district!.id)
+            Form(domainName: state.selectedDomainName!, shopName: state.shopName!, cityID: state.city!.id, districtID: state.district!.id)
         }.flatMap {
             useCase.submit($0)
         }
             
         
         return Output(
-            shopNameError: shopNameError,
-            domainName: domainSuggestion,
-        
-            domainNameError: _shopDomainError,
-            
-            selectedCity: _selectCitySuccess,
-            citySelectionError: _selectCityFail,
-            selectedDistrict: selectedDistrict,
-            
-            districtSelectioonError: districtFailure,
             showDistrictSelection: showDistrictSelection,
-            submissionResult: submissionResult
+            submissionResult: submissionResult,
+            
+            state: Driver.merge(
+                shopNameError.map { _ in state },
+                domainSuggestion.map { _ in state },
+                _shopDomainError.map { _ in state },
+                _selectCitySuccess.map { _ in state },
+                _selectCityFail.map { _ in state },
+                selectedDistrict.map { _ in state },
+                districtFailure.map { _ in state }
+            )
         )
     }
 }

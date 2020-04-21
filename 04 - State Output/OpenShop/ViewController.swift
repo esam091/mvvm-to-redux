@@ -99,23 +99,42 @@ class ViewController: UIViewController {
         
         output.showDistrictSelection.drive(showDistrictSelection).disposed(by: rx.disposeBag)
         
-        output.domainName.drive(shopDomainField.rx.text).disposed(by: rx.disposeBag)
-        output.shopNameError.drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
-        output.domainNameError.drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
+        /*
+         If you take a look at the console log, the shop domain will always be emitted even though
+         only other fields are changed
+         */
+        output.state
+            .map { $0.selectedDomainName }
+            .debug("shop domain")
+            .drive(shopDomainField.rx.text).disposed(by: rx.disposeBag)
         
-        output.selectedCity.map { $0.name }.drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        output.state.map { $0.shopNameErrorMessage }
+            .debug("shop name error")
+            .drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.selectedDistrict.map { $0.name }.drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        output.state.map { $0.domainErrorMessage }
+            .debug("domain error")
+            .drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.citySelectionError
+        output.state.compactMap { $0.city?.name }
+            .debug("city name")
+            .drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        
+        output.state.compactMap { $0.district?.name }.drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        
+        output
+            .state.map { $0.cityError }
+            .debug("city error")
             .map { err in err != nil ? "Please select city" : "" }
             .drive(cityLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.districtSelectioonError.map { err in
-            switch err {
-            case .dismissed: return "no district selected"
-            case .noCitySelected: return "please select a city first"
-            default: return ""
+        output.state.map { $0.districtError }
+            .debug("district error")
+            .map { err in
+                switch err {
+                case .dismissed: return "no district selected"
+                case .noCitySelected: return "please select a city first"
+                default: return ""
             }
         }.drive(districtLabel.rx.text).disposed(by: rx.disposeBag)
         

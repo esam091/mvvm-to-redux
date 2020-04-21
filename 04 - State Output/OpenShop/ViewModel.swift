@@ -24,7 +24,7 @@ enum OpenShopInput {
     case submitButtonDidTap
 }
 
-struct State {
+struct State: Equatable {
     var shopName: String?
     var shopNameErrorMessage: String?
     

@@ -99,36 +99,42 @@ class ViewController: UIViewController {
         
         output.showDistrictSelection.drive(showDistrictSelection).disposed(by: rx.disposeBag)
         
-        /*
-         If you take a look at the console log, the shop domain will always be emitted even though
-         only other fields are changed
-         */
+
         output.state
             .map { $0.selectedDomainName }
+            .distinctUntilChanged() // This will prevent the same values from being emitted multiple times, preventing unnecessary re-render
             .debug("shop domain")
             .drive(shopDomainField.rx.text).disposed(by: rx.disposeBag)
         
         output.state.map { $0.shopNameErrorMessage }
+            .distinctUntilChanged()
             .debug("shop name error")
             .drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
         
         output.state.map { $0.domainErrorMessage }
+            .distinctUntilChanged()
             .debug("domain error")
             .drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
         
         output.state.compactMap { $0.city?.name }
+            .distinctUntilChanged()
             .debug("city name")
             .drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
-        output.state.compactMap { $0.district?.name }.drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
+        output.state.compactMap { $0.district?.name }
+            .distinctUntilChanged()
+            .debug("district name")
+            .drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
         output
             .state.map { $0.cityError }
+            .distinctUntilChanged()
             .debug("city error")
             .map { err in err != nil ? "Please select city" : "" }
             .drive(cityLabel.rx.text).disposed(by: rx.disposeBag)
         
         output.state.map { $0.districtError }
+            .distinctUntilChanged()
             .debug("district error")
             .map { err in
                 switch err {

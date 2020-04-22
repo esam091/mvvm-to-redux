@@ -45,6 +45,7 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
     switch action {
     case let .shopNameDidChange(shopName):
         state.shopName = shopName
+        state.shopNameErrorMessage = nil
         
         return [ environment.checkShopName(shopName).map(OpenShopInput.didValidateShopName) ]
     
@@ -56,6 +57,7 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         
     case let .shopDomainDidChange(domainName):
         state.selectedDomainName = domainName
+        state.domainErrorMessage = nil
         
         return [
             environment.checkDomainName(domainName).flatMap { result -> Driver<OpenShopInput> in

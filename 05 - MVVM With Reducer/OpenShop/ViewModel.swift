@@ -47,6 +47,12 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         
         return [ environment.checkShopName(shopName).map(OpenShopInput.didValidateShopName) ]
     
+    case let .didValidateShopName(response):
+        state.shopNameErrorMessage = response.shopNameErrorMessage
+        state.selectedDomainName = response.suggestedDomain
+        
+        return []
+        
     default: return []
     }
 }
@@ -59,6 +65,7 @@ class ViewModel {
     }
     
     private let useCase: UseCase
+    private let disposeBag = DisposeBag()
     
     
     init(useCase: UseCase) {
@@ -71,97 +78,26 @@ class ViewModel {
         
         var state = State()
         
-        let shopNameDidChange = input.compactMap(/OpenShopInput.shopNameDidChange)
-        let shopDomainDidChange = input.compactMap(/OpenShopInput.shopDomainDidChange)
-        let cityDidSelected = input.compactMap(/OpenShopInput.cityDidSelected)
-        let cityDidDismissed = input.compactMap(/OpenShopInput.cityDidDismissed)
-        let districtDidSelected = input.compactMap(/OpenShopInput.districtDidSelected)
-        let districtDidDismissed = input.compactMap(/OpenShopInput.districtDidDismissed)
-        let districtDidTapped = input.compactMap(/OpenShopInput.districtDidTapped)
-        let submitButtonDidTap = input.compactMap(/OpenShopInput.submitButtonDidTap)
+        let subject = PublishSubject<OpenShopInput>()
         
-        let inputShopName = shopNameDidChange.do(onNext: { state.shopName = $0 })
-        let shopDomain = shopDomainDidChange.do(onNext: { state.selectedDomainName = $0 })
+        input.drive(subject).disposed(by: disposeBag)
         
-        let shopNameCheck = inputShopName
-            .flatMapLatest {
-                useCase.checkShopName($0)
+        subject.asDriver(onErrorDriveWith: .empty()).flatMap { action -> Driver<OpenShopInput> in
+            let effect = reducer(state: &state, action: action, environment: useCase)
+            return Driver.from(effect).merge()
         }
+        .drive(subject).disposed(by: disposeBag)
         
-        let domainSuggestion = shopNameCheck.map { $0.suggestedDomain }.do(onNext: { state.selectedDomainName = $0 })
-        
-        let shopNameError = Driver<String?>.merge(
-            shopNameCheck.map { $0.shopNameErrorMessage }.filter {
-                $0 != nil
-            }.map { $0! },
-            
-            inputShopName.map { _ in nil }
-        )
-            .do(onNext: { state.shopNameErrorMessage = $0 })
-        
-        let domainCheck = shopDomain.flatMap { domain in
-            useCase.checkDomainName(domain)
-        }
-        
-        let _shopDomainError = Driver<String?>.merge(
-            shopDomain.map { _ in nil },
-            domainCheck.success.map { nil },
-            domainCheck.failure.map { $0.message }
-        ).do(onNext: { state.domainErrorMessage = $0 })
-        
-        let _selectCityFail = Driver.merge(
-            cityDidDismissed.filter { _ in state.city == nil } .map { CitySelectionError.dismissed },
-            cityDidSelected.map { _ -> CitySelectionError? in nil  }
-        ).do(onNext: { state.cityError = $0 })
-        
-        
-        let _selectCitySuccess = cityDidSelected
-            .do(onNext: { state.city = $0 })
-        
-        let selectedDistrict = districtDidSelected
-            .do(onNext: { state.district = $0 })
-        
-        let districtFailure = Driver<DistrictSelectionError?>.merge(
-            districtDidDismissed.filter { _ in state.district == nil }.map { _ in DistrictSelectionError.dismissed },
-            districtDidTapped.filter { _ in state.city == nil }.map { _ in DistrictSelectionError.noCitySelected },
-            districtDidTapped.filter { _ in state.city != nil }.map { _ in nil }
-        ).do(onNext: { state.districtError = $0 })
-        
-        let showDistrictSelection = districtDidTapped
-            .filter { _ in state.city != nil }
-            .map { () }
-        
-        let submissionResult = submitButtonDidTap
-            .filter {
-                state.shopName != nil
-                    && state.shopNameErrorMessage == nil
-                    && state.selectedDomainName != nil
-                    && state.domainErrorMessage == nil
-                    && state.city != nil
-                    && state.cityError == nil
-                    && state.district != nil
-                    && state.districtError == nil
-        }
-        .map { _ in
-            Form(domainName: state.selectedDomainName!, shopName: state.shopName!, cityID: state.city!.id, districtID: state.district!.id)
-        }.flatMap {
-            useCase.submit($0)
-        }
-            
+        let stateOutput = subject
+            .asDriver(onErrorDriveWith: .empty())
+            .debug("action")
+            .map { _ in state }
         
         return Output(
-            showDistrictSelection: showDistrictSelection,
-            submissionResult: submissionResult,
+            showDistrictSelection: .empty(),
+            submissionResult: .empty(),
             
-            state: Driver.merge(
-                shopNameError.map { _ in state },
-                domainSuggestion.map { _ in state },
-                _shopDomainError.map { _ in state },
-                _selectCitySuccess.map { _ in state },
-                _selectCityFail.map { _ in state },
-                selectedDistrict.map { _ in state },
-                districtFailure.map { _ in state }
-            )
+            state: stateOutput
         )
     }
 }

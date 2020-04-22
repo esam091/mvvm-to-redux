@@ -13,7 +13,7 @@ import RxCocoa
 import CasePaths
 
 
-enum OpenShopInput {
+enum Action {
     case shopNameDidChange(String)
     case shopDomainDidChange(String)
     case cityDidSelected(City)
@@ -43,13 +43,13 @@ struct State: Equatable {
     var districtError: DistrictSelectionError?
 }
 
-func reducer(state: inout State, action: OpenShopInput, environment: UseCase) -> [Driver<OpenShopInput>] {
+func reducer(state: inout State, action: Action, environment: UseCase) -> [Driver<Action>] {
     switch action {
     case let .shopNameDidChange(shopName):
         state.shopName = shopName
         state.shopNameErrorMessage = nil
         
-        return [ environment.checkShopName(shopName).map(OpenShopInput.didValidateShopName) ]
+        return [ environment.checkShopName(shopName).map(Action.didValidateShopName) ]
     
     case let .didValidateShopName(response):
         state.shopNameErrorMessage = response.shopNameErrorMessage
@@ -62,7 +62,7 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         state.domainErrorMessage = nil
         
         return [
-            environment.checkDomainName(domainName).flatMap { result -> Driver<OpenShopInput> in
+            environment.checkDomainName(domainName).flatMap { result -> Driver<Action> in
                 switch result {
                 case .success: return .empty()
                 case let .failure(error): return .just(.domainNameError(error.message))
@@ -116,7 +116,7 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         
         return [
             environment.submit(Form(domainName: domainName, shopName: shopName, cityID: city.id, districtID: district.id))
-                .map(OpenShopInput.submissionResult)
+                .map(Action.submissionResult)
         ]
         
     default: return []
@@ -126,7 +126,7 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
 class ViewModel {
     struct Output {
         let submissionResult: Driver<Result<Void, SimpleErrorMessage>>
-        let action: Driver<OpenShopInput>
+        let action: Driver<Action>
         let state: Driver<State>
     }
     
@@ -139,16 +139,16 @@ class ViewModel {
     }
     
     
-    func transform(_ input: Driver<OpenShopInput>) -> Output {
+    func transform(_ input: Driver<Action>) -> Output {
         let useCase = self.useCase
         
         var state = State()
         
-        let subject = PublishSubject<OpenShopInput>()
+        let subject = PublishSubject<Action>()
         
         input.drive(subject).disposed(by: disposeBag)
         
-        subject.asDriver(onErrorDriveWith: .empty()).flatMap { action -> Driver<OpenShopInput> in
+        subject.asDriver(onErrorDriveWith: .empty()).flatMap { action -> Driver<Action> in
             let effect = reducer(state: &state, action: action, environment: useCase)
             return Driver.from(effect).merge()
         }

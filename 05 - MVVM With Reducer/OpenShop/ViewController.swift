@@ -78,31 +78,31 @@ class ViewController: UIViewController {
             shopNameField
                 .rx.textChanged
                 .asDriver(onErrorDriveWith: .empty())
-                .map(OpenShopInput.shopNameDidChange),
+                .map(Action.shopNameDidChange),
             
             shopDomainField.rx.textChanged.asDriver(onErrorDriveWith: .empty())
-                .map(OpenShopInput.shopDomainDidChange),
+                .map(Action.shopDomainDidChange),
             
             cityDidSelected
-                .map(OpenShopInput.cityDidSelected),
+                .map(Action.cityDidSelected),
             
             citySelectionDismissed
-                .map { OpenShopInput.cityDidDismissed },
+                .map { Action.cityDidDismissed },
             
             districtButton.rx.tap.asDriver()
-                .map { OpenShopInput.districtDidTapped },
+                .map { Action.districtDidTapped },
             
             districtDidSelected
-                .map(OpenShopInput.districtDidSelected),
+                .map(Action.districtDidSelected),
             
             districtDidDismissed
-                .map { OpenShopInput.districtDidDismissed },
+                .map { Action.districtDidDismissed },
             
             createShopButton.rx.tap.asDriver()
-                .map { OpenShopInput.submitButtonDidTap }
+                .map { Action.submitButtonDidTap }
         ))
         
-        output.action.compactMap(/OpenShopInput.showDistrictSelection).drive(showDistrictSelection).disposed(by: rx.disposeBag)
+        output.action.compactMap(/Action.showDistrictSelection).drive(showDistrictSelection).disposed(by: rx.disposeBag)
         
 
         output.state
@@ -149,7 +149,7 @@ class ViewController: UIViewController {
             }
         }.drive(districtLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.action.compactMap(/OpenShopInput.submissionResult).drive(onNext: { [weak self] result in
+        output.action.compactMap(/Action.submissionResult).drive(onNext: { [weak self] result in
             let message: String
             
             switch result {

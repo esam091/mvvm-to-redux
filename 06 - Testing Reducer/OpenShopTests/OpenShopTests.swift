@@ -11,7 +11,98 @@ import XCTest
 import RxSwift
 import RxCocoa
 
+struct Step<Value, Action> {
+    let kind: Kind
+    let action: Action?
+    let update: (inout Value) -> Void
+    let file: StaticString
+    let line: UInt
+    
+    enum Kind {
+        case send
+        case receive
+    }
+    
+    init(_ kind: Kind, action: Action?, file: StaticString = #file, line: UInt = #line, update: @escaping (inout Value) -> Void = { _ in }) {
+        self.kind = kind
+        self.update = update
+        self.file = file
+        self.line = line
+        self.action = action
+    }
+}
 
+func assertSteps<Value: Equatable, Action: Equatable, Environment>(
+    initialValue: Value,
+    reducer: @escaping (inout Value, Action, Environment) -> [Driver<Action>],
+    environment: Environment,
+    steps: Step<Value, Action>...,
+    file: StaticString = #file,
+    line: UInt = #line
+) {
+    var pendingEffects: [Driver<Action>] = []
+    var value = initialValue
+    let disposeBag = DisposeBag()
+    
+    steps.forEach { step in
+        var expected = value
+        
+        switch step.kind {
+        case .send:
+            if !pendingEffects.isEmpty {
+                XCTFail("Unprocessed effect detected before sending another action", file: step.file, line: step.line)
+            }
+            
+            guard let action = step.action else {
+                XCTAssertNotNil(step.action, "Actions cannot be nil when sending", file: step.file, line: step.line)
+                break
+            }
+            
+            let effects = reducer(&value, action, environment)
+            pendingEffects.append(contentsOf: effects)
+            
+        case .receive:
+            if pendingEffects.isEmpty {
+                XCTFail("No more effect to process", file: step.file, line: step.line)
+                break
+            }
+            
+            let waiter = XCTWaiter()
+            let expectation = XCTestExpectation(description: "stream completion")
+            
+            var receivedAction: Action?
+            
+            let effect = pendingEffects.removeFirst()
+            effect
+                .drive(onNext: { action in
+                    receivedAction = action
+                }, onCompleted: {
+                    expectation.fulfill()
+                })
+                .disposed(by: disposeBag)
+            
+            waiter.wait(for: [expectation], timeout: 0.01)
+            
+            XCTAssertEqual(step.action, receivedAction, file: file, line: line)
+            
+            if let action = receivedAction {
+                XCTAssertEqual(receivedAction!, action, file: step.file, line: step.line)
+                
+                let effects = reducer(&value, action, environment)
+                pendingEffects.append(contentsOf: effects)
+            }
+        }
+        
+        
+        step.update(&expected)
+        
+        XCTAssertEqual(value, expected, file: step.file, line: step.line)
+    }
+    
+    if !pendingEffects.isEmpty {
+        XCTFail("There are still \(pendingEffects.count) unprocessed effects", file: file, line: line)
+    }
+}
 
 class OpenShopTests: XCTestCase {
     

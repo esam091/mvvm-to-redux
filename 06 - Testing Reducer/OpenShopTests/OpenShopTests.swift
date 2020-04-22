@@ -166,97 +166,144 @@ class OpenShopTests: XCTestCase {
             Step(.receive, action: nil) // TODO: nil action don't need to be listed
         )
     }
-//
-//    func test_inputDomainName_invalid() {
-//        useCase.checkDomainName = { _ in
-//            .just(.failure(SimpleErrorMessage(message: "error")))
-//        }
-//
-//        input.onNext(.shopDomainDidChange("foo"))
-//
-//        state.assertLastValue(State(selectedDomainName: "foo", domainErrorMessage: "error"))
-//    }
-//
-//    func test_inputCity_dismissed() {
-//        input.onNext(.cityDidDismissed)
-//
-//        state.assertLastValue(State(cityError: .dismissed))
-//    }
-//
-//    func test_inputCity_success() {
-//        let city = City(id: 1, name: "Hyrule")
-//        input.onNext(.cityDidSelected(city))
-//
-//        state.assertLastValue(State(city: city))
-//
-//        input.onNext(.cityDidDismissed)
-//
-//        state.assertLastValue(State(city: city))
-//    }
-//
-//    func test_inputDistrict_success() {
-//        let city = City(id: 2, name: "Tokyo")
-//        let district = District(id: 1, name: "Shibuya")
-//
-//        input.onNext(.cityDidSelected(city))
-//        state.assertLastValue(State(city: city))
-//
-//        input.onNext(.districtDidTapped)
-//
-//        showDistrictSelection.assertDidEmitValues(count: 1)
-//
-//        input.onNext(.districtDidSelected(district))
-//
-//        state.assertLastValue(State(city: city, district: district))
-//    }
-//
-//    func test_inputDistrict_noCitySelected() {
-//        input.onNext(.districtDidTapped)
-//
-//        state.assertLastValue(State(districtError: .noCitySelected))
-//    }
-//
-//    func test_inputDistrict_dismissed() {
-//        let city = City(id: 2, name: "Tokyo")
-//
-//        input.onNext(.cityDidSelected(city))
-//        state.assertLastValue(State(city: city))
-//
-//        input.onNext(.districtDidTapped)
-//
-//        showDistrictSelection.assertDidEmitValues(count: 1)
-//
-//        input.onNext(.districtDidDismissed)
-//
-//        state.assertLastValue(State(city: city, districtError: .dismissed))
-//    }
-//
-//    func test_allFieldsValid_willSubmitToServer() {
-//        let city = City(id: 2, name: "Tokyo")
-//        let district = District(id: 1, name: "Shibuya")
-//
-//        useCase.checkShopName = { _ in
-//            .just(ValidateShopNameResponse(suggestedDomain: "foo-domain", shopNameErrorMessage: nil))
-//        }
-//
-//
-//        useCase.submit = { _ in
-//            .just(.success(()))
-//        }
-//
-//        input.onNext(.shopNameDidChange("foo-shop"))
-//        state.assertLastValue(State(shopName: "foo-shop", selectedDomainName: "foo-domain"))
-//
-//        input.onNext(.cityDidSelected(city))
-//        state.assertLastValue(State(shopName: "foo-shop", selectedDomainName: "foo-domain", city: city))
-//
-//        input.onNext(.districtDidTapped)
-//
-//        input.onNext(.districtDidSelected(district))
-//        state.assertLastValue(State(shopName: "foo-shop", selectedDomainName: "foo-domain", city: city, district: district))
-//
-//        input.onNext(.submitButtonDidTap)
-//
-//        submissionResult.assertDidEmitValues(count: 1)
-//    }
+
+    func test_inputDomainName_invalid() {
+        var useCase = UseCase.mock
+        useCase.checkDomainName = { _ in
+            .just(.failure(SimpleErrorMessage(message: "error")))
+        }
+        
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: useCase,
+            steps:
+            Step(.send, action: .shopDomainDidChange("domain")) {
+                $0.selectedDomainName = "domain"
+            },
+            Step(.receive, action: .domainNameError("error")) {
+                $0.domainErrorMessage = "error"
+            }
+        )
+    }
+
+    func test_inputCity_dismissed() {
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: UseCase.mock,
+            steps:
+            Step(.send, action: .cityDidDismissed) {
+                $0.cityError = .dismissed
+            }
+        )
+    }
+
+    func test_inputCity_success() {
+        let city = City(id: 1, name: "Hyrule")
+        
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: UseCase.mock,
+            steps:
+            Step(.send, action: .cityDidDismissed) {
+                $0.cityError = .dismissed
+            },
+            Step(.send, action: .cityDidSelected(city)) {
+                $0.city = city
+                $0.cityError = nil
+            },
+            Step(.send, action: .cityDidDismissed)
+            
+        )
+    }
+
+    func test_inputDistrict_success() {
+        let city = City(id: 2, name: "Tokyo")
+        let district = District(id: 1, name: "Shibuya")
+
+        
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: UseCase.mock,
+            steps:
+            Step(.send, action: .cityDidSelected(city)) {
+                $0.city = city
+            },
+            Step(.send, action: .districtDidTapped),
+            Step(.receive, action: .showDistrictSelection),
+            Step(.send, action: .districtDidSelected(district)) {
+                $0.district = district
+            }
+        )
+    }
+
+    func test_inputDistrict_noCitySelected() {
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: UseCase.mock,
+            steps: Step(.send, action: .districtDidTapped) {
+                $0.districtError = .noCitySelected
+            }
+        )
+    }
+
+    func test_inputDistrict_dismissed() {
+        let city = City(id: 2, name: "Tokyo")
+
+        assertSteps(
+            initialValue: State(city: city), // start the state from when the city is already selected
+            reducer: reducer,
+            environment: UseCase.mock,
+            steps:
+            Step(.send, action: .districtDidTapped),
+            Step(.receive, action: .showDistrictSelection),
+            Step(.send, action: .districtDidDismissed) {
+                $0.districtError = .dismissed
+            }
+        )
+    }
+
+    func test_allFieldsValid_willSubmitToServer() {
+        let useCase = UseCase.mock
+        
+        let city = City(id: 2, name: "Tokyo")
+        let district = District(id: 1, name: "Shibuya")
+
+        useCase.checkShopName = { _ in
+            .just(ValidateShopNameResponse(suggestedDomain: "foo-domain", shopNameErrorMessage: nil))
+        }
+
+
+        useCase.submit = { _ in
+            .just(.success(Unit()))
+        }
+        
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: useCase,
+            steps:
+            Step(.send, action: .shopNameDidChange("Nook Inc")) {
+                $0.shopName = "Nook Inc"
+            },
+            Step(.receive, action: .didValidateShopName(ValidateShopNameResponse(suggestedDomain: "foo-domain", shopNameErrorMessage: nil))) {
+                $0.selectedDomainName = "foo-domain"
+            },
+            Step(.send, action: .cityDidSelected(city)) {
+                $0.city = city
+            },
+            Step(.send, action: .districtDidTapped),
+            Step(.receive, action: .showDistrictSelection),
+            Step(.send, action: .districtDidSelected(district)) {
+                $0.district = district
+            },
+            Step(.send, action: .submitButtonDidTap),
+            Step(.receive, action: .submissionResult(.success(Unit())))
+            
+        )
+    }
 }

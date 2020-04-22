@@ -33,7 +33,7 @@ class ViewController: UIViewController {
         var useCase = UseCase.mock
         
         useCase.checkShopName = { name in
-            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: "invalid shop name"))
+            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: nil))
                 .delay(.seconds(2))
 
         }
@@ -149,7 +149,7 @@ class ViewController: UIViewController {
             }
         }.drive(districtLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.submissionResult.drive(onNext: { [weak self] result in
+        output.action.compactMap(/OpenShopInput.submissionResult).drive(onNext: { [weak self] result in
             let message: String
             
             switch result {
@@ -161,6 +161,7 @@ class ViewController: UIViewController {
             alert.addAction(.init(title: "OK", style: .default, handler: nil))
             self?.present(alert, animated: false, completion: nil)
         }).disposed(by: rx.disposeBag)
+        
     }
 
 

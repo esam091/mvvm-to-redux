@@ -26,6 +26,7 @@ enum OpenShopInput {
     case didValidateShopName(ValidateShopNameResponse)
     case domainNameError(String)
     case showDistrictSelection
+    case submissionResult(Result<Void, SimpleErrorMessage>)
 }
 
 struct State: Equatable {
@@ -103,6 +104,20 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         state.district = district
         state.districtError = nil
         return []
+        
+    case .submitButtonDidTap:
+        guard let shopName = state.shopName,
+            let domainName = state.selectedDomainName,
+            let city = state.city,
+            let district = state.district,
+            state.shopNameErrorMessage == nil && state.domainErrorMessage == nil && state.cityError == nil && state.districtError == nil else {
+                return []
+        }
+        
+        return [
+            environment.submit(Form(domainName: domainName, shopName: shopName, cityID: city.id, districtID: district.id))
+                .map(OpenShopInput.submissionResult)
+        ]
         
     default: return []
     }

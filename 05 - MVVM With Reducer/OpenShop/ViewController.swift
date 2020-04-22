@@ -37,6 +37,10 @@ class ViewController: UIViewController {
 
         }
         
+        useCase.checkDomainName = { name in
+            Driver.just(.failure(SimpleErrorMessage(message: "\(name) is already taken"))).delay(.seconds(1))
+        }
+        
         useCase.submit = { _ in
             Driver.just(.success(())).delay(.seconds(1))
         }

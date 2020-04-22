@@ -12,8 +12,10 @@ import RxRelay
 import RxCocoa
 import CasePaths
 
+// Void is an empty tuple, and tuples cannot be Equatables. Think of Unit as an Equatable version of void
+struct Unit: Equatable {}
 
-enum Action {
+enum Action: Equatable {
     case shopNameDidChange(String)
     case shopDomainDidChange(String)
     case cityDidSelected(City)
@@ -26,7 +28,7 @@ enum Action {
     case didValidateShopName(ValidateShopNameResponse)
     case domainNameError(String)
     case showDistrictSelection
-    case submissionResult(Result<Void, SimpleErrorMessage>)
+    case submissionResult(Result<Unit, SimpleErrorMessage>)
 }
 
 struct State: Equatable {

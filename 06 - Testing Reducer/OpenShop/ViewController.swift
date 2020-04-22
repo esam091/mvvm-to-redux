@@ -43,7 +43,7 @@ class ViewController: UIViewController {
         }
         
         useCase.submit = { _ in
-            Driver.just(.success(())).delay(.seconds(1))
+            Driver.just(.success(Unit())).delay(.seconds(1))
         }
         
         viewModel = ViewModel(useCase: useCase)

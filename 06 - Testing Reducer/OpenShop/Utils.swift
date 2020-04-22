@@ -63,12 +63,12 @@ extension SharedSequence where Element: ResultType {
 class UseCase {
     var checkShopName: (String) -> Driver<ValidateShopNameResponse>
     var checkDomainName: (String) -> Driver<Result<(), SimpleErrorMessage>>
-    var submit: (Form) -> Driver<Result<Void, SimpleErrorMessage>>
+    var submit: (Form) -> Driver<Result<Unit, SimpleErrorMessage>>
     
     init(
         checkShopName: @escaping (String) -> Driver<ValidateShopNameResponse>,
         checkDomainName: @escaping (String) -> Driver<Result<(), SimpleErrorMessage>>,
-        submit: @escaping (Form) -> Driver<Result<Void, SimpleErrorMessage>>
+        submit: @escaping (Form) -> Driver<Result<Unit, SimpleErrorMessage>>
     ) {
         self.checkShopName = checkShopName
         self.checkDomainName = checkDomainName
@@ -96,7 +96,7 @@ enum DistrictSelectionError: Error {
 }
 
 
-struct ValidateShopNameResponse {
+struct ValidateShopNameResponse: Equatable {
     let suggestedDomain: String
     let shopNameErrorMessage: String?
 }

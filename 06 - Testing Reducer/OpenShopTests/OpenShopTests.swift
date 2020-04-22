@@ -83,10 +83,10 @@ func assertSteps<Value: Equatable, Action: Equatable, Environment>(
             
             waiter.wait(for: [expectation], timeout: 0.01)
             
-            XCTAssertEqual(step.action, receivedAction, file: file, line: line)
+            
             
             if let action = receivedAction {
-                XCTAssertEqual(receivedAction!, action, file: step.file, line: step.line)
+                XCTAssertEqual(step.action, action, file: step.file, line: step.line)
                 
                 let effects = reducer(&value, action, environment)
                 pendingEffects.append(contentsOf: effects)

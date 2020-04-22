@@ -109,30 +109,21 @@ class OpenShopTests: XCTestCase {
     func test_inputShowName_showDomainSuggestion() {
         var useCase = UseCase.mock
         useCase.checkShopName = { _ in
-            .just(ValidateShopNameResponse(suggestedDomain: "foo", shopNameErrorMessage: nil))
+            Driver.just(ValidateShopNameResponse(suggestedDomain: "foo", shopNameErrorMessage: nil))
         }
         
-        let disposeBag = DisposeBag()
-
-        var state = State()
-        var effects = reducer(state: &state, action: .shopNameDidChange("something"), environment: useCase)
-        
-        XCTAssertEqual(state, State(shopName: "something"))
-        XCTAssertEqual(effects.count, 1)
-        
-        var action: Action!
-        effects[0].drive(onNext: {
-            action = $0
-        }).disposed(by: disposeBag)
-        
-        effects = reducer(state: &state, action: action, environment: useCase)
-        XCTAssertEqual(effects.count, 0)
-        
-        XCTAssertEqual(state, State(shopName: "something", selectedDomainName: "foo"))
-        
-//        input.onNext(.shopNameDidChange("something"))
-//
-//        state.assertLastValue(State(shopName: "something", selectedDomainName: "foo"))
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: useCase,
+            steps:
+            Step(.send, action: .shopNameDidChange("my shop")) {
+                $0.shopName = "my shop"
+            },
+            Step(.receive, action: .didValidateShopName(ValidateShopNameResponse(suggestedDomain: "foo", shopNameErrorMessage: nil))) {
+                $0.selectedDomainName = "foo"
+            }
+        )
     }
 
 //    func test_inputShopName_showDomainSuggestionWithErrors() {

@@ -126,33 +126,46 @@ class OpenShopTests: XCTestCase {
         )
     }
 
-//    func test_inputShopName_showDomainSuggestionWithErrors() {
-//        let called = expectation(description: "use case called")
-//
-//        useCase.checkShopName = { _ in
-//            Driver.just(ValidateShopNameResponse(suggestedDomain: "bar", shopNameErrorMessage: "error message"))
-//                .delay(.nanoseconds(1))
-//                .do(onNext: { _ in called.fulfill() })
-//        }
-//
-//        input.onNext(.shopNameDidChange("another thing"))
-//        state.assertLastValue(State(shopName: "another thing"))
-//
-//        wait(for: [called], timeout: 0.001)
-//
-//
-//        state.assertLastValue(State(shopName: "another thing", shopNameErrorMessage: "error message", selectedDomainName: "bar"))
-//    }
-//
-//    func test_inputDomainName_valid() {
-//        useCase.checkDomainName = { _ in
-//            .just(.success(()))
-//        }
-//
-//        input.onNext(.shopDomainDidChange("foo"))
-//
-//        state.assertLastValue(State(selectedDomainName: "foo"))
-//    }
+    func test_inputShopName_showDomainSuggestionWithErrors() {
+        var useCase = UseCase.mock
+        
+        useCase.checkShopName = { _ in
+            Driver.just(ValidateShopNameResponse(suggestedDomain: "bar", shopNameErrorMessage: "error message"))
+                
+        }
+
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: useCase,
+            steps:
+            Step(.send, action: .shopNameDidChange("my shop")) {
+                $0.shopName = "my shop"
+            },
+            Step(.receive, action: .didValidateShopName(ValidateShopNameResponse(suggestedDomain: "bar", shopNameErrorMessage: "error message"))) {
+                $0.selectedDomainName = "bar"
+                $0.shopNameErrorMessage = "error message"
+            }
+        )
+    }
+
+    func test_inputDomainName_valid() {
+        var useCase = UseCase.mock
+        useCase.checkDomainName = { _ in
+            .just(.success(()))
+        }
+
+        assertSteps(
+            initialValue: State(),
+            reducer: reducer,
+            environment: useCase,
+            steps:
+            Step(.send, action: .shopDomainDidChange("foo")) {
+                $0.selectedDomainName = "foo"
+            },
+            Step(.receive, action: nil) // TODO: nil action don't need to be listed
+        )
+    }
 //
 //    func test_inputDomainName_invalid() {
 //        useCase.checkDomainName = { _ in

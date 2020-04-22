@@ -75,6 +75,14 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         
     case let .cityDidSelected(city):
         state.city = city
+        state.cityError = nil
+        return []
+        
+    case .cityDidDismissed:
+        if state.city == nil {
+            state.cityError = . dismissed
+        }
+        
         return []
         
     case .districtDidTapped:
@@ -84,6 +92,12 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         } else {
             return [.just(.showDistrictSelection)]
         }
+        
+    case .districtDidDismissed:
+        if state.district == nil {
+            state.districtError = .dismissed
+        }
+        return []
         
     case let .districtDidSelected(district):
         state.district = district

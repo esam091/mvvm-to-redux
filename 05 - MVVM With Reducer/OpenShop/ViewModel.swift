@@ -38,6 +38,15 @@ struct State: Equatable {
     var districtError: DistrictSelectionError?
 }
 
+func reducer(state: inout State, action: OpenShopInput) {
+    switch action {
+    case let .shopNameDidChange(shopName):
+        state.shopName = shopName
+        
+    default: break
+    }
+}
+
 class ViewModel {
     struct Output {
         let showDistrictSelection: Driver<Void>

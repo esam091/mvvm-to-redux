@@ -22,6 +22,8 @@ enum OpenShopInput {
     case districtDidSelected(District)
     case districtDidDismissed
     case submitButtonDidTap
+    
+    case didValidateShopName(ValidateShopNameResponse)
 }
 
 struct State: Equatable {
@@ -38,12 +40,14 @@ struct State: Equatable {
     var districtError: DistrictSelectionError?
 }
 
-func reducer(state: inout State, action: OpenShopInput) {
+func reducer(state: inout State, action: OpenShopInput, environment: UseCase) -> [Driver<OpenShopInput>] {
     switch action {
     case let .shopNameDidChange(shopName):
         state.shopName = shopName
         
-    default: break
+        return [ environment.checkShopName(shopName).map(OpenShopInput.didValidateShopName) ]
+    
+    default: return []
     }
 }
 

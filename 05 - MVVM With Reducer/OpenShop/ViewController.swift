@@ -10,6 +10,7 @@ import UIKit
 import RxCocoa
 import NSObject_Rx
 import RxSwift
+import CasePaths
 
 class ViewController: UIViewController {
     @IBOutlet var shopNameField: UITextField!
@@ -32,7 +33,7 @@ class ViewController: UIViewController {
         var useCase = UseCase.mock
         
         useCase.checkShopName = { name in
-            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: nil))
+            Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: "invalid shop name"))
                 .delay(.seconds(2))
 
         }
@@ -101,7 +102,7 @@ class ViewController: UIViewController {
                 .map { OpenShopInput.submitButtonDidTap }
         ))
         
-        output.showDistrictSelection.drive(showDistrictSelection).disposed(by: rx.disposeBag)
+        output.action.compactMap(/OpenShopInput.showDistrictSelection).drive(showDistrictSelection).disposed(by: rx.disposeBag)
         
 
         output.state

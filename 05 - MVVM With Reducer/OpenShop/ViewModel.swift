@@ -25,6 +25,7 @@ enum OpenShopInput {
     
     case didValidateShopName(ValidateShopNameResponse)
     case domainNameError(String)
+    case showDistrictSelection
 }
 
 struct State: Equatable {
@@ -72,14 +73,31 @@ func reducer(state: inout State, action: OpenShopInput, environment: UseCase) ->
         state.domainErrorMessage = message
         return []
         
+    case let .cityDidSelected(city):
+        state.city = city
+        return []
+        
+    case .districtDidTapped:
+        if state.city == nil {
+            state.districtError = .noCitySelected
+            return []
+        } else {
+            return [.just(.showDistrictSelection)]
+        }
+        
+    case let .districtDidSelected(district):
+        state.district = district
+        state.districtError = nil
+        return []
+        
     default: return []
     }
 }
 
 class ViewModel {
     struct Output {
-        let showDistrictSelection: Driver<Void>
         let submissionResult: Driver<Result<Void, SimpleErrorMessage>>
+        let action: Driver<OpenShopInput>
         let state: Driver<State>
     }
     
@@ -114,9 +132,9 @@ class ViewModel {
             .debug("state")
         
         return Output(
-            showDistrictSelection: .empty(),
             submissionResult: .empty(),
             
+            action: subject.asDriver(onErrorDriveWith: .empty()),
             state: stateOutput
         )
     }

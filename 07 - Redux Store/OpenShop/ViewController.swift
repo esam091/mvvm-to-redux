@@ -27,10 +27,12 @@ class ViewController: UIViewController {
     
     @IBOutlet var createShopButton: UIButton!
     
-    var viewModel: ViewModel 
+    
+    let store: Store<State, Action, UseCase>
+    
     
     required init?(coder: NSCoder) {
-        var useCase = UseCase.mock
+        let useCase = UseCase.mock
         
         useCase.checkShopName = { name in
             Driver.just(ValidateShopNameResponse(suggestedDomain: "something random", shopNameErrorMessage: nil))
@@ -39,14 +41,16 @@ class ViewController: UIViewController {
         }
         
         useCase.checkDomainName = { name in
-            Driver.just(.failure(SimpleErrorMessage(message: "\(name) is already taken"))).delay(.seconds(1))
+//            Driver.just(.failure(SimpleErrorMessage(message: "\(name) already taken"))).delay(.seconds(1))
+            Driver.just(.success(())).delay(.seconds(1))
         }
         
         useCase.submit = { _ in
             Driver.just(.success(Unit())).delay(.seconds(1))
         }
         
-        viewModel = ViewModel(useCase: useCase)
+        store = Store(initialValue: State(), reducer: reducer, environment: useCase)
+        
         super.init(coder: coder)
     }
     
@@ -74,7 +78,8 @@ class ViewController: UIViewController {
         let districtDidSelected = districtSelection.flatMap { $0.selectedDistrict }
         let districtDidDismissed = districtSelection.flatMap { $0.closed }
         
-        let output = viewModel.transform(Driver.merge(
+        
+        Driver.merge(
             shopNameField
                 .rx.textChanged
                 .asDriver(onErrorDriveWith: .empty())
@@ -100,56 +105,54 @@ class ViewController: UIViewController {
             
             createShopButton.rx.tap.asDriver()
                 .map { Action.submitButtonDidTap }
-        ))
+        ).drive(onNext: {[weak self] action in
+            self?.store.send(action)
+        }).disposed(by: rx.disposeBag)
         
-        output.action.compactMap(/Action.showDistrictSelection).drive(showDistrictSelection).disposed(by: rx.disposeBag)
+        store.subscribeAction(/Action.showDistrictSelection).drive(showDistrictSelection).disposed(by: rx.disposeBag)
         
+        
+        store.subscribe(\.selectedDomainName)
+            .drive(shopDomainField.rx.text)
+            .disposed(by: rx.disposeBag)
 
-        output.state
-            .map { $0.selectedDomainName }
-            .distinctUntilChanged() // This will prevent the same values from being emitted multiple times, preventing unnecessary re-render
-            .debug("shop domain")
-            .drive(shopDomainField.rx.text).disposed(by: rx.disposeBag)
-        
-        output.state.map { $0.shopNameErrorMessage }
-            .distinctUntilChanged()
-            .debug("shop name error")
+        store.subscribe(\.shopNameErrorMessage)
             .drive(shopNameLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.state.map { $0.domainErrorMessage }
-            .distinctUntilChanged()
-            .debug("domain error")
+        
+        
+        store.subscribe(\.domainErrorMessage)
             .drive(shopDomainLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.state.compactMap { $0.city?.name }
-            .distinctUntilChanged()
-            .debug("city name")
+        
+        store.subscribe(\.city?.name)
+            .compactMap { $0 }
             .drive(cityButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
-        output.state.compactMap { $0.district?.name }
-            .distinctUntilChanged()
-            .debug("district name")
+        
+        store.subscribe(\.district?.name)
+            .compactMap { $0 }
             .drive(districtButton.rx.title(for: .normal)).disposed(by: rx.disposeBag)
         
-        output
-            .state.map { $0.cityError }
-            .distinctUntilChanged()
-            .debug("city error")
+        
+        store.subscribe(\.cityError)
             .map { err in err != nil ? "Please select city" : "" }
             .drive(cityLabel.rx.text).disposed(by: rx.disposeBag)
         
-        output.state.map { $0.districtError }
-            .distinctUntilChanged()
-            .debug("district error")
-            .map { err in
+        
+        store
+            .subscribe(\.districtError)
+            .map ({ err -> String in
                 switch err {
                 case .dismissed: return "no district selected"
                 case .noCitySelected: return "please select a city first"
                 default: return ""
-            }
-        }.drive(districtLabel.rx.text).disposed(by: rx.disposeBag)
+                }})
+                .drive(districtLabel.rx.text)
+                .disposed(by: rx.disposeBag)
         
-        output.action.compactMap(/Action.submissionResult).drive(onNext: { [weak self] result in
+        
+        store.subscribeAction(/Action.submissionResult).drive(onNext: { [weak self] result in
             let message: String
             
             switch result {
@@ -161,7 +164,6 @@ class ViewController: UIViewController {
             alert.addAction(.init(title: "OK", style: .default, handler: nil))
             self?.present(alert, animated: false, completion: nil)
         }).disposed(by: rx.disposeBag)
-        
     }
 
 

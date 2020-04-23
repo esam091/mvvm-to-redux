@@ -125,48 +125,48 @@ func reducer(state: inout State, action: Action, environment: UseCase) -> [Drive
     }
 }
 
-class ViewModel {
-    struct Output {
-        let submissionResult: Driver<Result<Void, SimpleErrorMessage>>
-        let action: Driver<Action>
-        let state: Driver<State>
-    }
+typealias Reducer<State, Action, Environment> = (inout State, Action, Environment) -> [Driver<Action>]
+
+class Store<State: Equatable, Action, Environment> {
+    private(set) var state: State
+    private let reducer: Reducer<State, Action, Environment>
+    private let environment: Environment
     
-    private let useCase: UseCase
     private let disposeBag = DisposeBag()
+    private let subject = PublishSubject<State>()
+    private let actionSubject = PublishSubject<Action>()
     
-    
-    init(useCase: UseCase) {
-        self.useCase = useCase
+    init(
+        initialValue: State,
+        reducer: @escaping Reducer<State, Action, Environment>,
+        environment: Environment
+    ) {
+        self.state = initialValue
+        self.reducer = reducer
+        self.environment = environment
     }
     
-    
-    func transform(_ input: Driver<Action>) -> Output {
-        let useCase = self.useCase
+    func send(_ action: Action) {
+        actionSubject.onNext(action)
+        let effects = reducer(&state, action, environment)
+        subject.onNext(state)
         
-        var state = State()
-        
-        let subject = PublishSubject<Action>()
-        
-        input.drive(subject).disposed(by: disposeBag)
-        
-        subject.asDriver(onErrorDriveWith: .empty()).flatMap { action -> Driver<Action> in
-            let effect = reducer(state: &state, action: action, environment: useCase)
-            return Driver.from(effect).merge()
+        effects.forEach { (effect) in
+            effect.drive(onNext: { [weak self] action in
+                self?.send(action)
+            }).disposed(by: disposeBag)
         }
-        .drive(subject).disposed(by: disposeBag)
-        
-        let stateOutput = subject
+    }
+    
+    func subscribe<SubState: Equatable>(_ keyPath: KeyPath<State, SubState>) -> Driver<SubState> {
+        subject.asDriver(onErrorDriveWith: .empty())
+            .map { $0[keyPath: keyPath] }
+            .distinctUntilChanged()
+    }
+    
+    func subscribeAction<SubAction>(_ casePath: CasePath<Action, SubAction>) -> Driver<SubAction> {
+        actionSubject
             .asDriver(onErrorDriveWith: .empty())
-            .debug("action")
-            .map { _ in state }
-            .debug("state")
-        
-        return Output(
-            submissionResult: .empty(),
-            
-            action: subject.asDriver(onErrorDriveWith: .empty()),
-            state: stateOutput
-        )
+            .compactMap(casePath.extract(from:))
     }
 }
